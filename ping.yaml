@@ -1,0 +1,12 @@
+---
+- name: Test connection
+  hosts: windows
+  tasks:
+    - name: Ping the client
+      win_ping:
+
+- name: Test connection
+  hosts: linux
+  tasks:
+    - name: Ping the client
+      ping:

@@ -1,0 +1,11 @@
+---
+- name: Remove IIS on 2022
+  hosts: windows
+    #become: yes
+  become_method: runas
+  become_user: administrator
+  tasks:
+    - name: Remove IIS on 2022
+      win_feature:
+        name: Web-Server
+        state: absent      

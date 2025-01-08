@@ -1,0 +1,13 @@
+---
+- name: Test PowerShell Command on Windows Hosts
+  hosts: windows
+  gather_facts: yes
+  tasks:
+    - name: Test PowerShell
+      win_shell: |
+        whoami
+      register: result_get_host
+
+    - name: Display result_get_host
+      debug:
+        var: result_get_host
