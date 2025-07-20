@@ -1,0 +1,131 @@
+---
+- name: Install Jenkins on Rocky Linux 9 with Firewall Configuration
+  hosts: jenkins_servers
+  become: yes
+  vars:
+    jenkins_port: 8080
+    jenkins_agent_port: 50000
+
+  tasks:
+    - name: Install Java (OpenJDK 17)
+      dnf:
+        name: 
+          - java-17-openjdk
+          - java-17-openjdk-devel
+        state: present
+
+    - name: Add Jenkins repository
+      get_url:
+        url: https://pkg.jenkins.io/redhat-stable/jenkins.repo
+        dest: /etc/yum.repos.d/jenkins.repo
+        mode: '0644'
+
+    - name: Import Jenkins repository GPG key
+      rpm_key:
+        state: present
+        key: https://pkg.jenkins.io/redhat-stable/jenkins.io-2023.key
+
+    - name: Install Jenkins
+      dnf:
+        name: jenkins
+        state: present
+
+    - name: Ensure Jenkins is started and enabled
+      systemd:
+        name: jenkins
+        state: started
+        enabled: yes
+
+    - name: Check if firewalld is running
+      systemd:
+        name: firewalld
+      register: firewalld_status
+      check_mode: no
+
+    - name: Configure firewalld for Jenkins (if firewalld is active)
+      block:
+        - name: Add Jenkins HTTP port to firewalld
+          firewalld:
+            port: "{{ jenkins_port }}/tcp"
+            permanent: yes
+            state: enabled
+          notify: reload firewalld
+
+        - name: Add Jenkins agent port to firewalld
+          firewalld:
+            port: "{{ jenkins_agent_port }}/tcp"
+            permanent: yes
+            state: enabled
+          notify: reload firewalld
+
+        - name: Add Jenkins service to firewalld (alternative method)
+          firewalld:
+            service: jenkins
+            permanent: yes
+            state: enabled
+          notify: reload firewalld
+          ignore_errors: yes
+
+      when: firewalld_status.status.ActiveState == "active"
+
+    - name: Configure iptables for Jenkins (if firewalld is not active)
+      block:
+        - name: Ensure iptables service is running
+          systemd:
+            name: iptables
+            state: started
+            enabled: yes
+
+        - name: Add Jenkins HTTP port to iptables INPUT chain
+          iptables:
+            chain: INPUT
+            protocol: tcp
+            destination_port: "{{ jenkins_port }}"
+            jump: ACCEPT
+            comment: "Jenkins HTTP port"
+            action: insert
+            rule_num: 1
+
+        - name: Add Jenkins agent port to iptables INPUT chain
+          iptables:
+            chain: INPUT
+            protocol: tcp
+            destination_port: "{{ jenkins_agent_port }}"
+            jump: ACCEPT
+            comment: "Jenkins agent port"
+            action: insert
+            rule_num: 2
+
+        - name: Save iptables rules
+          shell: service iptables save
+          args:
+            creates: /etc/sysconfig/iptables
+
+      when: firewalld_status.status.ActiveState != "active"
+
+    - name: Wait for Jenkins to be ready
+      wait_for:
+        host: "{{ ansible_default_ipv4.address }}"
+        port: "{{ jenkins_port }}"
+        timeout: 60
+      delegate_to: localhost
+      run_once: yes
+
+    - name: Display Jenkins access information
+      debug:
+        msg: |
+          Jenkins has been installed and configured successfully!
+          
+          Access Jenkins at: http://{{ ansible_default_ipv4.address }}:{{ jenkins_port }}
+          
+          Initial admin password location: /var/lib/jenkins/secrets/initialAdminPassword
+          
+          Firewall has been configured to allow:
+          - HTTP access on port {{ jenkins_port }}
+          - Agent connections on port {{ jenkins_agent_port }}
+
+  handlers:
+    - name: reload firewalld
+      systemd:
+        name: firewalld
+        state: reloaded 

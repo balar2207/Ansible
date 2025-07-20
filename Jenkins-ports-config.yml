@@ -1,0 +1,65 @@
+---
+- name: Configure Firewall Ports on Rocky Linux 9
+  hosts: linux
+  become: yes
+  vars:
+    # Define the ports you want to open
+    firewall_ports:
+      - port: 8080
+        protocol: tcp
+        description: "Jenkins"
+
+  tasks:
+    - name: Ensure firewalld is installed
+      dnf:
+        name: firewalld
+        state: present
+
+    - name: Ensure firewalld service is running and enabled
+      systemd:
+        name: firewalld
+        state: started
+        enabled: yes
+
+    - name: Check if firewalld is running
+      command: firewall-cmd --state
+      register: firewall_state
+      changed_when: false
+      failed_when: false
+
+    - name: Start firewalld if not running
+      systemd:
+        name: firewalld
+        state: started
+      when: "'running' not in firewall_state.stdout"
+
+    - name: Add ports to firewall
+      firewalld:
+        port: "{{ item.port }}/{{ item.protocol }}"
+        permanent: yes
+        state: enabled
+        immediate: yes
+      loop: "{{ firewall_ports }}"
+      register: firewall_result
+
+    - name: Display firewall configuration
+      command: firewall-cmd --list-ports
+      register: firewall_ports_list
+      changed_when: false
+
+    - name: Show current firewall ports
+      debug:
+        msg: "Current firewall ports: {{ firewall_ports_list.stdout_lines }}"
+
+    - name: Reload firewall to apply changes
+      firewalld:
+        state: reloaded
+
+    - name: Verify firewall is active
+      command: firewall-cmd --state
+      register: final_firewall_state
+      changed_when: false
+
+    - name: Display final firewall state
+      debug:
+        msg: "Firewall state: {{ final_firewall_state.stdout }}"
