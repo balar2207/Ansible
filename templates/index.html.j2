@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to {{ server_name }}</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 40px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            max-width: 600px;
+            margin: 20px;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 2.5em;
+        }
+        .server-info {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            border-left: 4px solid #667eea;
+        }
+        .status {
+            color: #28a745;
+            font-weight: bold;
+            font-size: 1.2em;
+        }
+        .details {
+            color: #666;
+            line-height: 1.6;
+        }
+        .footer {
+            margin-top: 30px;
+            color: #888;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Apache HTTP Server</h1>
+        <div class="status">✅ Successfully Running!</div>
+        
+        <div class="server-info">
+            <h3>Server Information</h3>
+            <div class="details">
+                <p><strong>Server Name:</strong> {{ server_name }}</p>
+                <p><strong>Document Root:</strong> {{ document_root }}</p>
+                <p><strong>HTTP Port:</strong> {{ http_port }}</p>
+                <p><strong>HTTPS Port:</strong> {{ https_port }}</p>
+                <p><strong>Server Time:</strong> <span id="server-time"></span></p>
+            </div>
+        </div>
+        
+        <div class="details">
+            <p>This page confirms that Apache HTTP Server has been successfully installed and configured on your Rocky Linux 9 system.</p>
+            <p>The server is now ready to serve web content and handle HTTP requests.</p>
+        </div>
+        
+        <div class="footer">
+            <p>Configured with Ansible | Rocky Linux 9 | Apache HTTP Server</p>
+        </div>
+    </div>
+
+    <script>
+        // Display current server time
+        function updateTime() {
+            const now = new Date();
+            document.getElementById('server-time').textContent = now.toLocaleString();
+        }
+        updateTime();
+        setInterval(updateTime, 1000);
+    </script>
+</body>
+</html> 

@@ -1,0 +1,116 @@
+---
+- name: Install and Configure HTTP (Apache) on Rocky Linux 9
+  hosts: all
+  become: yes
+  vars:
+    http_port: 80
+    https_port: 443
+    server_name: "{{ ansible_hostname }}"
+    document_root: "/var/www/html"
+    
+  tasks:
+    - name: Update package cache
+      dnf:
+        update_cache: yes
+      when: ansible_os_family == "RedHat"
+
+    - name: Install Apache HTTP Server
+      dnf:
+        name: 
+          - httpd
+          - mod_ssl
+          - openssl
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Create custom Apache configuration directory
+      file:
+        path: /etc/httpd/conf.d/custom
+        state: directory
+        mode: '0755'
+        owner: root
+        group: root
+
+    - name: Configure Apache main settings
+      template:
+        src: apache_main.conf.j2
+        dest: /etc/httpd/conf.d/custom/main.conf
+        owner: root
+        group: root
+        mode: '0644'
+      notify: restart httpd
+
+    - name: Configure virtual host
+      template:
+        src: virtual_host.conf.j2
+        dest: /etc/httpd/conf.d/custom/virtual_host.conf
+        owner: root
+        group: root
+        mode: '0644'
+      notify: restart httpd
+
+    - name: Create document root directory
+      file:
+        path: "{{ document_root }}"
+        state: directory
+        mode: '0755'
+        owner: apache
+        group: apache
+
+    - name: Create sample index.html
+      template:
+        src: index.html.j2
+        dest: "{{ document_root }}/index.html"
+        owner: apache
+        group: apache
+        mode: '0644'
+
+    - name: Set SELinux context for document root
+      sefcontext:
+        target: '{{ document_root }}(/.*)?'
+        setype: httpd_sys_content_t
+        state: present
+      when: ansible_selinux.status == "enabled"
+
+    - name: Apply SELinux context changes
+      command: restorecon -Rv {{ document_root }}
+      when: ansible_selinux.status == "enabled"
+
+    - name: Configure firewall for HTTP
+      firewalld:
+        port: "{{ http_port }}/tcp"
+        permanent: yes
+        state: enabled
+        immediate: yes
+
+    - name: Configure firewall for HTTPS
+      firewalld:
+        port: "{{ https_port }}/tcp"
+        permanent: yes
+        state: enabled
+        immediate: yes
+
+    - name: Enable and start Apache service
+      systemd:
+        name: httpd
+        state: started
+        enabled: yes
+
+    - name: Verify Apache is running
+      uri:
+        url: "http://{{ ansible_default_ipv4.address }}:{{ http_port }}"
+        status_code: 200
+      register: apache_test
+      retries: 3
+      delay: 10
+      until: apache_test.status == 200
+
+    - name: Display Apache status
+      debug:
+        msg: "Apache HTTP Server is successfully installed and running on port {{ http_port }}"
+
+  handlers:
+    - name: restart httpd
+      systemd:
+        name: httpd
+        state: restarted 
