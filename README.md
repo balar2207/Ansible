@@ -4,9 +4,15 @@ Master/Controller node:
 
 #ssh-copy-id user@linux-client-ip
 
-#ansible-playbook macOS-shutdown.yml -i hosts
+Staging Changes
+git add <filename>
 
-#curl https://github.com/balar2207/Ansible/blob/main/macOS/macOS-shutdown.yml | ansible-playbook -i hosts/ /dev/stdin
+Committing With Staging
+git commit -m "Your commit message"
 
-#wget -O - https://github.com/balar2207/Ansible/blob/main/macOS/macOS-shutdown.yml | ansible-playbook -i hosts/ /dev/stdin
+
+Committing Without Staging
+git commit -am "Your commit message"
+
+git push
 
