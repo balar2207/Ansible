@@ -1,5 +1,5 @@
 ---
-- name: Install Xcode 13.4 on macOS
+- name: Install Xcode 13.2 on macOS
   hosts: macos
   gather_facts: yes
   become: yes
