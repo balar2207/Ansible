@@ -1,0 +1,73 @@
+---
+- name: Install Xcode Command Line Tools on macOS
+  hosts: macOS
+  gather_facts: yes
+  become: yes
+  
+  tasks:
+    - name: Check if running on macOS
+      fail:
+        msg: "This playbook is designed to run on macOS systems only"
+      when: ansible_os_family != "Darwin"
+      
+    - name: Display macOS version
+      debug:
+        msg: "Running on macOS {{ ansible_distribution_version }}"
+        
+    - name: Check if Xcode Command Line Tools are already installed
+      command: xcode-select --print-path
+      register: xcode_select_result
+      failed_when: false
+      changed_when: false
+      
+    - name: Display current Xcode Command Line Tools status
+      debug:
+        msg: "Xcode Command Line Tools already installed at: {{ xcode_select_result.stdout }}"
+      when: xcode_select_result.rc == 0
+      
+    - name: Install Xcode Command Line Tools if not present
+      command: xcode-select --install
+      when: xcode_select_result.rc != 0
+      register: clt_install
+      
+    - name: Wait for Command Line Tools installation to complete
+      pause:
+        seconds: 60
+        prompt: "Please wait for Xcode Command Line Tools installation to complete. This may take several minutes."
+      when: xcode_select_result.rc != 0
+      
+    - name: Verify Command Line Tools installation
+      command: xcode-select --print-path
+      register: final_clt_check
+      when: xcode_select_result.rc != 0
+      
+    - name: Display final Command Line Tools status
+      debug:
+        msg: "Xcode Command Line Tools installed at: {{ final_clt_check.stdout }}"
+      when: 
+        - xcode_select_result.rc != 0
+        - final_clt_check.rc == 0
+        
+    - name: Accept Xcode license agreement
+      command: xcodebuild -license accept
+      become: yes
+      register: license_result
+      failed_when: false
+      
+    - name: Verify git is available
+      command: git --version
+      register: git_check
+      
+    - name: Display git version
+      debug:
+        msg: "Git version: {{ git_check.stdout }}"
+        
+    - name: Verify clang is available
+      command: clang --version
+      register: clang_check
+      failed_when: false
+      
+    - name: Display clang version
+      debug:
+        msg: "Clang version: {{ clang_check.stdout }}"
+      when: clang_check.rc == 0 

@@ -1,0 +1,148 @@
+---
+- name: Install Xcode on macOS
+  hosts: macOS
+  gather_facts: yes
+  become: yes
+  
+  vars:
+    xcode_version: "13.2"  # Specify the Xcode version you want to install
+    install_command_line_tools: true
+    install_full_xcode: true
+    
+  tasks:
+    - name: Check if running on macOS
+      fail:
+        msg: "This playbook is designed to run on macOS systems only"
+      when: ansible_os_family != "Darwin"
+      
+    - name: Display macOS version
+      debug:
+        msg: "Running on macOS {{ ansible_distribution_version }}"
+        
+    - name: Check if Xcode Command Line Tools are already installed
+      command: xcode-select --print-path
+      register: xcode_select_result
+      failed_when: false
+      changed_when: false
+      
+    - name: Display Xcode Command Line Tools status
+      debug:
+        msg: "Xcode Command Line Tools path: {{ xcode_select_result.stdout }}"
+      when: xcode_select_result.rc == 0
+      
+    - name: Install Xcode Command Line Tools if not present
+      command: xcode-select --install
+      when: 
+        - install_command_line_tools
+        - xcode_select_result.rc != 0
+      register: clt_install
+      
+    - name: Wait for Command Line Tools installation to complete
+      pause:
+        seconds: 30
+      when: 
+        - install_command_line_tools
+        - xcode_select_result.rc != 0
+        - clt_install is defined
+        
+    - name: Accept Xcode license agreement
+      command: xcodebuild -license accept
+      become: yes
+      register: license_result
+      failed_when: false
+      
+    - name: Check if full Xcode is installed
+      stat:
+        path: /Applications/Xcode.app
+      register: xcode_app_check
+      
+    - name: Display Xcode app status
+      debug:
+        msg: "Full Xcode app found: {{ xcode_app_check.stat.exists }}"
+        
+    - name: Check current Xcode version if installed
+      command: xcodebuild -version
+      register: xcode_version_check
+      failed_when: false
+      when: xcode_app_check.stat.exists
+      
+    - name: Display current Xcode version
+      debug:
+        msg: "Current Xcode version: {{ xcode_version_check.stdout }}"
+      when: 
+        - xcode_app_check.stat.exists
+        - xcode_version_check.rc == 0
+        
+    - name: Install full Xcode from App Store (if not present)
+      block:
+        - name: Check if mas (Mac App Store CLI) is installed
+          command: which mas
+          register: mas_check
+          failed_when: false
+          
+        - name: Install mas if not present
+          homebrew:
+            name: mas
+            state: present
+          when: mas_check.rc != 0
+          
+        - name: Sign in to Mac App Store (requires manual intervention)
+          command: mas signin
+          register: mas_signin
+          failed_when: false
+          
+        - name: Search for Xcode in App Store
+          command: mas search Xcode
+          register: xcode_search
+          failed_when: false
+          
+        - name: Display Xcode search results
+          debug:
+            msg: "Xcode search results: {{ xcode_search.stdout }}"
+          when: xcode_search.rc == 0
+          
+        - name: Install Xcode from App Store
+          command: mas install 497799835  # Xcode App Store ID
+          register: xcode_install
+          failed_when: false
+          
+        - name: Display installation result
+          debug:
+            msg: "Xcode installation result: {{ xcode_install.stdout }}"
+          when: xcode_install is defined
+          
+      when: 
+        - install_full_xcode
+        - not xcode_app_check.stat.exists
+        
+    - name: Set Xcode as default developer directory
+      command: sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer
+      when: xcode_app_check.stat.exists
+      
+    - name: Verify Xcode installation
+      command: xcodebuild -version
+      register: final_xcode_check
+      
+    - name: Display final Xcode status
+      debug:
+        msg: "Final Xcode installation status: {{ final_xcode_check.stdout }}"
+        
+    - name: Check available iOS simulators
+      command: xcrun simctl list devices
+      register: simulator_list
+      failed_when: false
+      
+    - name: Display available simulators
+      debug:
+        msg: "Available iOS simulators: {{ simulator_list.stdout }}"
+      when: simulator_list.rc == 0
+      
+  handlers:
+    - name: restart system
+      reboot:
+        msg: "Rebooting system after Xcode installation"
+        connect_timeout: 5
+        reboot_timeout: 600
+        pre_reboot_delay: 0
+        post_reboot_delay: 30
+        test_command: whoami
