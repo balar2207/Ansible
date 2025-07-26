@@ -55,6 +55,10 @@
 #Ansible-winslave-VM1
 #Ansible-winslave-VM2
 
+[macOS]
+Ansible-macslave-VM1
+Ansible-macslave-VM2
+
 [linux]
 Ansible-rockyslave-VM1
 Ansible-rockyslave-VM2
