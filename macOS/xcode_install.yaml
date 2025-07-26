@@ -1,0 +1,87 @@
+---
+- name: Install Xcode Command Line Tools on macOS
+  hosts: macOS
+  gather_facts: yes
+  become: yes
+  
+  vars:
+    command_line_tools_path: "/Library/Developer/CommandLineTools"
+    
+  tasks:
+    - name: Check if Command Line Tools are already installed
+      stat:
+        path: "{{ command_line_tools_path }}"
+      register: clt_installed
+      
+    - name: Check current Xcode command line tools status
+      shell: xcode-select -p
+      register: xcode_select_status
+      ignore_errors: yes
+      
+    - name: Display current installation status
+      debug:
+        msg: 
+          - "Command Line Tools directory exists: {{ clt_installed.stat.exists }}"
+          - "Xcode-select path: {{ xcode_select_status.stdout | default('Not set') }}"
+          - "Xcode-select return code: {{ xcode_select_status.rc }}"
+          
+    - name: Install Command Line Tools if not present
+      shell: xcode-select --install
+      args:
+        creates: "{{ command_line_tools_path }}"
+      when: not clt_installed.stat.exists
+      register: clt_install
+      
+    - name: Wait for Command Line Tools installation to complete
+      shell: xcode-select -p
+      register: xcode_select_result
+      until: xcode_select_result.rc == 0
+      retries: 30
+      delay: 10
+      when: not clt_installed.stat.exists
+      
+    - name: Accept Xcode license agreement
+      shell: xcodebuild -license accept
+      when: clt_installed.stat.exists or clt_install is changed
+      
+    - name: Verify Command Line Tools installation
+      shell: xcodebuild -version
+      register: clt_version_check
+      when: clt_installed.stat.exists or clt_install is changed
+      
+    - name: Display Command Line Tools version
+      debug:
+        msg: "{{ clt_version_check.stdout }}"
+      when: clt_version_check is defined
+      
+    - name: Verify git is available (part of Command Line Tools)
+      shell: git --version
+      register: git_version_check
+      when: clt_installed.stat.exists or clt_install is changed
+      
+    - name: Display git version
+      debug:
+        msg: "{{ git_version_check.stdout }}"
+      when: git_version_check is defined
+      
+    - name: Verify other common tools
+      shell: |
+        echo "Clang version:"
+        clang --version
+        echo "Make version:"
+        make --version
+        echo "Python3 version:"
+        python3 --version
+      register: tools_check
+      when: clt_installed.stat.exists or clt_install is changed
+      
+    - name: Display tools information
+      debug:
+        msg: "{{ tools_check.stdout_lines }}"
+      when: tools_check is defined
+      
+  handlers:
+    - name: restart system if needed
+      shell: sudo shutdown -r now
+      async: 0
+      poll: 0
