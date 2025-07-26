@@ -1,0 +1,161 @@
+---
+- name: Install Xcode 13.4 on macOS
+  hosts: macos
+  gather_facts: yes
+  become: yes
+  
+  vars:
+    xcode_version: "13.4"
+    xcode_app_name: "Xcode"
+    xcode_install_path: "/Applications/Xcode.app"
+    developer_dir: "/Applications/Xcode.app/Contents/Developer"
+    
+  pre_tasks:
+    - name: Check if running on macOS
+      fail:
+        msg: "This playbook is designed to run on macOS systems only"
+      when: ansible_os_family != "Darwin"
+      
+    - name: Check macOS version compatibility
+      fail:
+        msg: "Xcode 13.4 requires macOS 11.3 or later"
+      when: ansible_distribution_version is version('11.3', '<')
+        
+  tasks:
+    - name: Check if Xcode is already installed
+      stat:
+        path: "{{ xcode_install_path }}"
+      register: xcode_installed
+      
+    - name: Check current Xcode version if installed
+      command: xcodebuild -version
+      register: xcode_version_check
+      failed_when: false
+      changed_when: false
+      when: xcode_installed.stat.exists
+      
+    - name: Display current Xcode version
+      debug:
+        msg: "Current Xcode version: {{ xcode_version_check.stdout_lines[0] if xcode_version_check.stdout_lines else 'Not installed' }}"
+      when: xcode_installed.stat.exists
+      
+    - name: Skip installation if correct version already installed
+      meta: end_play
+      when: 
+        - xcode_installed.stat.exists
+        - "'Xcode {{ xcode_version }}' in xcode_version_check.stdout"
+        
+    - name: Check available disk space (need at least 50GB)
+      shell: df -h /Applications | awk 'NR==2 {print $4}' | sed 's/G//'
+      register: available_space
+      changed_when: false
+      
+    - name: Convert available space to GB
+      set_fact:
+        available_gb: "{{ available_space.stdout | int }}"
+        
+    - name: Check if sufficient disk space is available
+      fail:
+        msg: "Insufficient disk space. Need at least 50GB, available: {{ available_gb }}GB"
+      when: available_gb < 50
+      
+    - name: Install Homebrew if not present
+      homebrew:
+        state: present
+      when: ansible_os_family == "Darwin"
+      
+    - name: Install xcode-select command line tools
+      command: xcode-select --install
+      register: xcode_select_result
+      failed_when: false
+      changed_when: false
+      
+    - name: Wait for xcode-select installation to complete
+      pause:
+        seconds: 30
+      when: xcode_select_result.rc == 0
+      
+    - name: Download Xcode 13.4 from Apple Developer Portal
+      uri:
+        url: "https://developer.apple.com/services-account/download?path=/Developer_Tools/Xcode_{{ xcode_version }}/Xcode_{{ xcode_version }}.xip"
+        dest: "/tmp/Xcode_{{ xcode_version }}.xip"
+        headers:
+          Cookie: "{{ developer_cookie | default('') }}"
+        timeout: 3600
+      register: xcode_download
+      when: not xcode_installed.stat.exists
+      
+    - name: Extract Xcode XIP file
+      command: xip -x "/tmp/Xcode_{{ xcode_version }}.xip"
+      args:
+        chdir: /tmp
+      register: xcode_extract
+      when: 
+        - not xcode_installed.stat.exists
+        - xcode_download is changed
+      
+    - name: Move Xcode to Applications directory
+      copy:
+        src: "/tmp/Xcode.app"
+        dest: "/Applications/"
+        remote_src: yes
+        mode: '0755'
+      register: xcode_move
+      when: 
+        - not xcode_installed.stat.exists
+        - xcode_extract is changed
+      
+    - name: Accept Xcode license agreement
+      command: "{{ xcode_install_path }}/Contents/Developer/usr/bin/xcodebuild -license accept"
+      register: license_accept
+      failed_when: false
+      when: xcode_move is changed
+      
+    - name: Set Xcode as default developer directory
+      command: xcode-select --switch "{{ xcode_install_path }}"
+      register: xcode_select_switch
+      when: xcode_move is changed
+      
+    - name: Install additional Xcode components
+      command: "{{ xcode_install_path }}/Contents/Developer/usr/bin/xcodebuild -runFirstLaunch"
+      register: first_launch
+      when: xcode_move is changed
+      
+    - name: Verify Xcode installation
+      command: xcodebuild -version
+      register: xcode_verify
+      changed_when: false
+      
+    - name: Display installation verification
+      debug:
+        msg: "Xcode installation verified: {{ xcode_verify.stdout_lines[0] }}"
+      when: xcode_verify.rc == 0
+      
+    - name: Clean up temporary files
+      file:
+        path: "/tmp/Xcode_{{ xcode_version }}.xip"
+        state: absent
+      when: xcode_move is changed
+      
+    - name: Clean up extracted files
+      file:
+        path: "/tmp/Xcode.app"
+        state: absent
+      when: xcode_move is changed
+      
+  post_tasks:
+    - name: Display installation summary
+      debug:
+        msg: |
+          Xcode {{ xcode_version }} installation completed successfully!
+          
+          Installation path: {{ xcode_install_path }}
+          Developer directory: {{ developer_dir }}
+          
+          To start using Xcode:
+          1. Open Xcode from Applications
+          2. Complete the initial setup wizard
+          3. Install any additional components as needed
+          
+          Note: You may need to sign in with your Apple Developer account
+          to access certain features and download additional components.
