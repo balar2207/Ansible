@@ -34,7 +34,7 @@
   
   tasks:
     - name: Shutdown Linux system
-      command: shutdown -h now
+      command: shutdown
       async: 0
       poll: 0
       register: shutdown_result
