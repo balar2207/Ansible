@@ -1,18 +1,18 @@
-- name: Shutdown windows
+--- name: Shutdown windows
   hosts: windows
   become: yes
   tasks:
     - name: Shutdown the system
       command: shutdown -p
 
-- name: Shutdown linux
+--- name: Shutdown linux
   hosts: linux
   become: yes
   tasks:
     - name: Shutdown the system
       command: shutdown
 
-- name: Shutdown macOS
+--- name: Shutdown macOS
   hosts: macOS
   become: yes
   tasks:
