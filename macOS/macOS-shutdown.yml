@@ -1,0 +1,6 @@
+- name: Shutdown macOS
+  hosts: macOS
+  become: yes
+  tasks:
+    - name: Shutdown the system
+      command: shutdown -h now
