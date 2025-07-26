@@ -58,4 +58,4 @@
       
     - name: Display shutdown status
       debug:
-        msg: "macOS VM {{ inventory_hostname }} shutdown initiated"
+        msg: "macOS VM {{ inventory_hostname }} shutdown initiated" 

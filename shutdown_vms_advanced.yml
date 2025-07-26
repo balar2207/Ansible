@@ -1,0 +1,141 @@
+---
+- name: Advanced VM Shutdown - macOS, Windows, and Linux
+  hosts: macOS,linux,windows
+  gather_facts: true
+  vars:
+    shutdown_timeout: 60
+    force_shutdown: false
+  
+  pre_tasks:
+    - name: Check if system is accessible
+      ping:
+      register: ping_result
+      
+    - name: Display system information
+      debug:
+        msg: |
+          Host: {{ inventory_hostname }}
+          OS: {{ ansible_distribution if ansible_distribution is defined else 'Unknown' }}
+          Version: {{ ansible_distribution_version if ansible_distribution_version is defined else 'Unknown' }}
+          Architecture: {{ ansible_architecture if ansible_architecture is defined else 'Unknown' }}
+
+---
+- name: Graceful Shutdown Windows VMs
+  hosts: windows
+  gather_facts: false
+  
+  tasks:
+    - name: Check for running processes
+      win_shell: tasklist /FI "STATUS eq RUNNING" | find /C "exe"
+      register: running_processes
+      ignore_errors: yes
+      
+    - name: Display running processes count
+      debug:
+        msg: "{{ running_processes.stdout }} running processes found"
+      when: running_processes.rc == 0
+      
+    - name: Graceful shutdown Windows system
+      win_shutdown:
+        msg: "System shutdown initiated by Ansible - Graceful shutdown"
+        timeout: "{{ shutdown_timeout }}"
+        force: "{{ force_shutdown }}"
+        restart: false
+      register: shutdown_result
+      
+    - name: Display shutdown status
+      debug:
+        msg: "Windows VM {{ inventory_hostname }} shutdown initiated successfully"
+      when: shutdown_result is succeeded
+
+---
+- name: Graceful Shutdown Linux VMs
+  hosts: linux
+  become: yes
+  gather_facts: false
+  
+  tasks:
+    - name: Check for running services
+      shell: systemctl list-units --state=running --no-legend | wc -l
+      register: running_services
+      ignore_errors: yes
+      
+    - name: Display running services count
+      debug:
+        msg: "{{ running_services.stdout }} running services found"
+      when: running_services.rc == 0
+      
+    - name: Graceful shutdown Linux system
+      shell: shutdown -h +1 "System shutdown initiated by Ansible"
+      async: 0
+      poll: 0
+      register: shutdown_result
+      
+    - name: Display shutdown status
+      debug:
+        msg: "Linux VM {{ inventory_hostname }} shutdown initiated (60 second delay)"
+      when: shutdown_result is succeeded
+
+---
+- name: Graceful Shutdown macOS VMs
+  hosts: macOS
+  become: yes
+  gather_facts: false
+  
+  tasks:
+    - name: Check for running applications
+      shell: ps aux | grep -v grep | wc -l
+      register: running_apps
+      ignore_errors: yes
+      
+    - name: Display running applications count
+      debug:
+        msg: "{{ running_apps.stdout }} running processes found"
+      when: running_apps.rc == 0
+      
+    - name: Graceful shutdown macOS system
+      shell: shutdown -h +1 "System shutdown initiated by Ansible"
+      async: 0
+      poll: 0
+      register: shutdown_result
+      
+    - name: Display shutdown status
+      debug:
+        msg: "macOS VM {{ inventory_hostname }} shutdown initiated (60 second delay)"
+      when: shutdown_result is succeeded
+
+---
+- name: Force Shutdown (Emergency)
+  hosts: macOS,linux,windows
+  gather_facts: false
+  vars:
+    force_shutdown: true
+  
+  tasks:
+    - name: Force shutdown all systems
+      block:
+        - name: Force shutdown Windows
+          win_shutdown:
+            msg: "EMERGENCY SHUTDOWN"
+            timeout: 10
+            force: yes
+          when: ansible_os_family == "Windows"
+          
+        - name: Force shutdown Linux
+          shell: shutdown -h now
+          async: 0
+          poll: 0
+          when: ansible_os_family == "RedHat" or ansible_os_family == "Debian"
+          
+        - name: Force shutdown macOS
+          shell: shutdown -h now
+          async: 0
+          poll: 0
+          when: ansible_os_family == "Darwin"
+          
+      when: force_shutdown | bool
+      
+    - name: Display force shutdown status
+      debug:
+        msg: "FORCE SHUTDOWN initiated for {{ inventory_hostname }}"
+      when: force_shutdown | bool 
