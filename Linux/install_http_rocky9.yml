@@ -65,8 +65,8 @@
         group: apache
         mode: '0644'
 
-    - name: Set seLinux context for document root
-      sefcontext:
+    - name: Set SELinux context for document root
+      ansible.posix.sefcontext:
         target: '{{ document_root }}(/.*)?'
         setype: httpd_sys_content_t
         state: present
