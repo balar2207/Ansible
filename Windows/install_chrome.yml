@@ -1,0 +1,49 @@
+---
+- name: Install Google Chrome on Windows Server 2022
+  hosts: windows
+  gather_facts: yes
+
+  tasks:
+    # Method 1: Install Chrome using Chocolatey (recommended)
+    - name: Install Google Chrome using Chocolatey
+      win_chocolatey:
+        name: googlechrome
+        state: present
+      ignore_errors: yes
+
+    # Method 2: Install Chrome using direct download (fallback)
+    - name: Download Google Chrome installer
+      win_get_url:
+        url: https://dl.google.com/chrome/install/ChromeStandaloneSetup64.exe
+        dest: C:\temp\ChromeStandaloneSetup64.exe
+      when: ansible_facts.packages['googlechrome'] is not defined
+      ignore_errors: yes
+
+    - name: Install Google Chrome from downloaded installer
+      win_package:
+        path: C:\temp\ChromeStandaloneSetup64.exe
+        arguments: /silent /install
+        state: present
+      when: ansible_facts.packages['googlechrome'] is not defined
+      ignore_errors: yes
+
+    - name: Verify Chrome installation
+      win_shell: |
+        try {
+          $chrome = Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*" | Where-Object {$_.DisplayName -like "*Google Chrome*"}
+          if ($chrome) {
+            Write-Host "Chrome is installed: $($chrome.DisplayName)"
+            exit 0
+          } else {
+            Write-Host "Chrome is not installed"
+            exit 1
+          }
+        } catch {
+          Write-Host "Error checking Chrome installation: $_"
+          exit 1
+        }
+      register: chrome_check
+
+    - name: Display Chrome installation status
+      debug:
+        msg: "{{ chrome_check.stdout_lines }}" 
