@@ -65,14 +65,10 @@
         group: apache
         mode: '0644'
 
-    - name: Set SELinux context for document root
-      file:
-        path: "{{ document_root }}"
-        selevel: s0
-        serole: object_r
-        setype: httpd_sys_content_t
-        seuser: system_u
+    - name: Set SELinux context for document root (if SELinux is enabled)
+      command: semanage fcontext -a -t httpd_sys_content_t "{{ document_root }}(/.*)?"
       when: ansible_selinux.status == "enabled"
+      ignore_errors: yes
 
     - name: Apply SELinux context changes recursively
       command: restorecon -Rv {{ document_root }}

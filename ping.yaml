@@ -1,12 +1,14 @@
 ---
-- name: Test connection
-  hosts: windows
+- name: Test connection to Linux and macOS nodes
+  hosts: linux,macOS
+  gather_facts: no
   tasks:
-    - name: Ping the client
-      win_ping:
+    - name: Ping Linux and macOS nodes
+      ping:
 
-- name: Test connection
-  hosts: linux
+- name: Test connection to Windows nodes
+  hosts: windows
+  gather_facts: no
   tasks:
-    - name: Ping the client
-      linux_ping:
+    - name: Ping Windows nodes
+      win_ping:
