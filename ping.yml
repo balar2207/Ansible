@@ -8,7 +8,7 @@
 - name: Test linux connection
   hosts: linux
   tasks:
-    - name: Ping the client
+    - name: Ping the clientls- l
       ping:
 
 - name: Test macOS connection
