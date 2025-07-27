@@ -1,0 +1,27 @@
+---
+- name: Install Apache httpd on Rocky Linux
+  hosts: all
+  become: yes
+
+  tasks:
+    - name: Install httpd package
+      yum:
+        name: httpd
+        state: present
+
+    - name: Ensure httpd is started and enabled
+      service:
+        name: httpd
+        state: started
+        enabled: yes
+
+    - name: Open HTTP port in firewall
+      firewalld:
+        service: http
+        permanent: yes
+        state: enabled
+        immediate: yes
+
+    - name: Reload firewalld
+      firewalld:
+        state: reloaded
