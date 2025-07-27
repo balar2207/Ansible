@@ -92,14 +92,3 @@
         name: tomcat
         state: restarted
         enabled: yes
-
-- name: Open port 8080 in the firewall
-  firewalld:
-    port: 8080/tcp
-    permanent: yes
-    state: enabled
-    immediate: yes
-
-- name: Reload firewalld to apply changes
-  firewalld:
-    state: reloaded
