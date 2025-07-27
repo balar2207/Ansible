@@ -86,6 +86,19 @@
           WantedBy=multi-user.target
       notify: Restart Tomcat
 
+    - name: Ensure firewalld is running and enabled
+      service:
+        name: firewalld
+        state: started
+        enabled: yes
+
+    - name: Open port 8080 in the firewall
+      firewalld:
+        port: 8080/tcp
+        permanent: yes
+        state: enabled
+        immediate: yes
+
   handlers:
     - name: Restart Tomcat
       systemd:
