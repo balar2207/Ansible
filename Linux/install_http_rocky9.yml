@@ -65,14 +65,14 @@
         group: apache
         mode: '0644'
 
-    - name: Set SELinux context for document root
+    - name: Set seLinux context for document root
       sefcontext:
         target: '{{ document_root }}(/.*)?'
         setype: httpd_sys_content_t
         state: present
       when: ansible_selinux.status == "enabled"
 
-    - name: Apply SELinux context changes
+    - name: Apply seLinux context changes
       command: restorecon -Rv {{ document_root }}
       when: ansible_selinux.status == "enabled"
 
