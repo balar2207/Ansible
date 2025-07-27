@@ -1,6 +1,6 @@
 ---
 - name: Install Apache Tomcat on Rocky Linux
-  hosts: all
+  hosts: linux
   become: yes
 
   vars:
@@ -95,10 +95,10 @@
 
 - name: Open port 8080 in the firewall
   firewalld:
-   port: 8080/tcp
-   permanent: yes
-   state: enabled
-   immediate: yes
+    port: 8080/tcp
+    permanent: yes
+    state: enabled
+    immediate: yes
 
 - name: Reload firewalld to apply changes
   firewalld:
