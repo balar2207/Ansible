@@ -15,6 +15,11 @@ Ansible-rockyslave-VM2
 Ansible-winslave-VM1
 Ansible-winslave-VM2
 
+[OVM]
+OVM-Server1
+OVM-Server2
+OVM-Server3
+
 [windows:vars]
 ansible_user=administrator
 ansible_password=123456@abc
