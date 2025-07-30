@@ -1,0 +1,35 @@
+- name: Update macOS system and packages
+  hosts: mac
+  become: yes
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+
+  tasks:
+
+    - name: List available software updates
+      shell: softwareupdate -l
+      register: sw_updates
+      changed_when: false
+
+    - name: Install all available updates
+      shell: softwareupdate -i -a
+      when: "'No new software available.' not in sw_updates.stdout"
+
+    - name: Install Command Line Tools if not installed
+      shell: |
+        if ! xcode-select -p &>/dev/null; then
+          touch /tmp/.com.apple.dt.CommandLineTools.installondemand.in-progress
+          PROD=$(softwareupdate -l |
+                 grep -E '\*.*Command Line Tools' |
+                 sort |
+                 tail -n1 | awk -F"*" '{print $2}' | sed -e 's/^ *//' |
+                 tr -d '\n')
+          softwareupdate -i "$PROD" --verbose
+        fi
+      args:
+        executable: /bin/bash
+
+    - name: Upgrade all Homebrew packages
+      homebrew:
+        update_homebrew: yes
+        upgrade_all: yes
