@@ -11,12 +11,19 @@ A basic playbook that:
 - Starts the service if not running
 - Displays the final status
 
-### 2. `windows-update-service.yml` (Comprehensive Version)
-A detailed playbook that:
-- Performs all the basic functions above
-- Provides detailed service information
-- Checks service dependencies
-- Shows comprehensive status reports
+### 2. `check-windows-update-service.yml` (Updated Version)
+An improved playbook that:
+- Checks and starts required dependency services first
+- Handles Windows Update service startup errors gracefully
+- Provides detailed error reporting and troubleshooting
+- Shows comprehensive service information
+
+### 3. `fix-windows-update-service.yml` (Troubleshooting Version)
+A robust playbook specifically designed to fix Windows Update service issues:
+- Resets the service configuration
+- Ensures all dependencies are running
+- Provides multiple fallback methods for starting the service
+- Offers detailed dependency analysis
 
 ## Prerequisites
 
@@ -31,9 +38,14 @@ A detailed playbook that:
 ansible-playbook -i inventory check-windows-update-service.yml
 ```
 
-### Run the comprehensive version:
+### Run the updated version:
 ```bash
-ansible-playbook -i inventory windows-update-service.yml
+ansible-playbook -i inventory check-windows-update-service.yml
+```
+
+### Run the troubleshooting version:
+```bash
+ansible-playbook -i inventory fix-windows-update-service.yml
 ```
 
 ### Run against specific hosts:
@@ -58,9 +70,31 @@ The playbooks will show:
 
 ## Troubleshooting
 
-1. **Service won't start**: Check if dependencies are running
-2. **Access denied**: Ensure running with administrator privileges
-3. **Connection issues**: Verify WinRM is properly configured
+### Common Windows Update Service Issues:
+
+1. **Service won't start**: 
+   - The Windows Update service has dependencies that must be running first
+   - Use `fix-windows-update-service.yml` to automatically handle dependencies
+   - Key dependencies: RpcEptMapper, RpcSs, DcomLaunch, CryptSvc, BITS
+
+2. **"Cannot start service wuauserv" error**:
+   - This usually means dependency services are not running
+   - The updated playbooks will automatically start required dependencies
+   - Try the troubleshooting playbook for more robust handling
+
+3. **Access denied**: 
+   - Ensure running with administrator privileges
+   - Verify WinRM is properly configured
+
+4. **Service stuck in stopping state**:
+   - The troubleshooting playbook will force-stop and restart the service
+   - This can resolve stuck service states
+
+### Recommended Approach:
+
+1. **First try**: `check-windows-update-service.yml` (handles dependencies)
+2. **If that fails**: `fix-windows-update-service.yml` (more aggressive troubleshooting)
+3. **Manual check**: Verify all dependency services are running manually
 
 ## Related Playbooks
 
