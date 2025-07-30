@@ -1,0 +1,166 @@
+---
+- name: Fix Windows Update Service Issues
+  hosts: windows
+  gather_facts: false
+  
+  tasks:
+    - name: Check current Windows Update service status
+      win_shell: |
+        $wuauserv = Get-Service -Name "wuauserv" -ErrorAction SilentlyContinue
+        if ($wuauserv) {
+            Write-Host "Service found: $($wuauserv.Name)"
+            Write-Host "Status: $($wuauserv.Status)"
+            Write-Host "Start Type: $($wuauserv.StartType)"
+        } else {
+            Write-Host "Windows Update service not found"
+        }
+      register: initial_check
+      
+    - name: Display initial status
+      debug:
+        msg: "{{ initial_check.stdout }}"
+        
+    - name: Stop Windows Update service if running (to reset it)
+      win_shell: |
+        $wuauserv = Get-Service -Name "wuauserv" -ErrorAction SilentlyContinue
+        if ($wuauserv -and $wuauserv.Status -eq "Running") {
+            Write-Host "Stopping Windows Update service to reset it..."
+            Stop-Service -Name "wuauserv" -Force -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds 3
+        }
+      register: stop_service
+      
+    - name: Display stop results
+      debug:
+        msg: "{{ stop_service.stdout }}"
+        
+    - name: Start required dependency services
+      win_shell: |
+        # List of services that Windows Update depends on
+        $dependencyServices = @(
+            "RpcEptMapper",
+            "RpcSs", 
+            "DcomLaunch",
+            "CryptSvc",
+            "BITS"
+        )
+        
+        Write-Host "Starting dependency services..."
+        foreach ($service in $dependencyServices) {
+            $svc = Get-Service -Name $service -ErrorAction SilentlyContinue
+            if ($svc) {
+                if ($svc.Status -ne "Running") {
+                    Write-Host "Starting $service..."
+                    Start-Service -Name $service -ErrorAction SilentlyContinue
+                    Start-Sleep -Seconds 2
+                } else {
+                    Write-Host "$service is already running"
+                }
+            } else {
+                Write-Host "Service $service not found"
+            }
+        }
+        
+        # Ensure BITS is running (critical for Windows Update)
+        $bits = Get-Service -Name "BITS" -ErrorAction SilentlyContinue
+        if ($bits -and $bits.Status -ne "Running") {
+            Write-Host "Starting BITS service..."
+            Start-Service -Name "BITS" -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds 3
+        }
+      register: start_dependencies
+      
+    - name: Display dependency start results
+      debug:
+        msg: "{{ start_dependencies.stdout }}"
+        
+    - name: Reset Windows Update service configuration
+      win_shell: |
+        Write-Host "Resetting Windows Update service configuration..."
+        
+        # Set service to manual start first
+        Set-Service -Name "wuauserv" -StartupType Manual -ErrorAction SilentlyContinue
+        
+        # Try to start the service
+        try {
+            Start-Service -Name "wuauserv" -ErrorAction Stop
+            Write-Host "Windows Update service started successfully"
+        } catch {
+            Write-Host "Failed to start Windows Update service: $($_.Exception.Message)"
+            
+            # Try alternative approach - restart the service
+            try {
+                Restart-Service -Name "wuauserv" -Force -ErrorAction Stop
+                Write-Host "Windows Update service restarted successfully"
+            } catch {
+                Write-Host "Failed to restart Windows Update service: $($_.Exception.Message)"
+            }
+        }
+      register: reset_service
+      
+    - name: Display reset results
+      debug:
+        msg: "{{ reset_service.stdout }}"
+        
+    - name: Set Windows Update service to auto-start
+      win_shell: |
+        $wuauserv = Get-Service -Name "wuauserv" -ErrorAction SilentlyContinue
+        if ($wuauserv) {
+            Set-Service -Name "wuauserv" -StartupType Automatic -ErrorAction SilentlyContinue
+            Write-Host "Set Windows Update service to auto-start"
+        }
+      register: set_autostart
+      
+    - name: Display autostart results
+      debug:
+        msg: "{{ set_autostart.stdout }}"
+        
+    - name: Verify final service status
+      win_shell: |
+        $wuauserv = Get-Service -Name "wuauserv" -ErrorAction SilentlyContinue
+        if ($wuauserv) {
+            Write-Host "Final Windows Update Service Status:"
+            Write-Host "  Name: $($wuauserv.Name)"
+            Write-Host "  Display Name: $($wuauserv.DisplayName)"
+            Write-Host "  Status: $($wuauserv.Status)"
+            Write-Host "  Start Type: $($wuauserv.StartType)"
+            
+            if ($wuauserv.Status -eq "Running") {
+                Write-Host "SUCCESS: Windows Update service is running"
+            } else {
+                Write-Host "WARNING: Windows Update service is not running"
+            }
+        } else {
+            Write-Host "ERROR: Windows Update service not found"
+        }
+      register: final_verification
+      
+    - name: Display final verification
+      debug:
+        msg: "{{ final_verification.stdout }}"
+        
+    - name: Check Windows Update service dependencies
+      win_shell: |
+        $wuauserv = Get-Service -Name "wuauserv" -ErrorAction SilentlyContinue
+        if ($wuauserv) {
+            Write-Host "Windows Update Service Dependencies:"
+            
+            $required = $wuauserv.ServicesDependedOn
+            Write-Host "Required Services ($($required.Count)):"
+            foreach ($req in $required) {
+                $reqStatus = (Get-Service -Name $req.Name -ErrorAction SilentlyContinue).Status
+                Write-Host "  - $($req.Name): $reqStatus"
+            }
+            
+            $dependent = $wuauserv.DependentServices
+            Write-Host "Dependent Services ($($dependent.Count)):"
+            foreach ($dep in $dependent) {
+                $depStatus = (Get-Service -Name $dep.Name -ErrorAction SilentlyContinue).Status
+                Write-Host "  - $($dep.Name): $depStatus"
+            }
+        }
+      register: dependency_info
+      
+    - name: Display dependency information
+      debug:
+        msg: "{{ dependency_info.stdout }}" 
