@@ -1,0 +1,277 @@
+---
+- name: Complete Windows Update Service Check and System Update
+  hosts: windows
+  gather_facts: false
+  
+  tasks:
+    # ========================================
+    # STEP 1: Check and Fix Windows Update Service
+    # ========================================
+    
+    - name: Check current Windows Update service status
+      win_shell: |
+        $wuauserv = Get-Service -Name "wuauserv" -ErrorAction SilentlyContinue
+        if ($wuauserv) {
+            Write-Host "Windows Update Service Status:"
+            Write-Host "  Name: $($wuauserv.Name)"
+            Write-Host "  Status: $($wuauserv.Status)"
+            Write-Host "  Start Type: $($wuauserv.StartType)"
+        } else {
+            Write-Host "Windows Update service not found"
+        }
+      register: service_status
+      
+    - name: Display initial service status
+      debug:
+        msg: "{{ service_status.stdout }}"
+        
+    - name: Start required dependency services for Windows Update
+      win_shell: |
+        # List of services that Windows Update depends on
+        $dependencyServices = @(
+            "RpcEptMapper",
+            "RpcSs", 
+            "DcomLaunch",
+            "CryptSvc",
+            "BITS"
+        )
+        
+        Write-Host "Starting Windows Update dependency services..."
+        foreach ($service in $dependencyServices) {
+            $svc = Get-Service -Name $service -ErrorAction SilentlyContinue
+            if ($svc) {
+                if ($svc.Status -ne "Running") {
+                    Write-Host "Starting $service..."
+                    Start-Service -Name $service -ErrorAction SilentlyContinue
+                    Start-Sleep -Seconds 2
+                } else {
+                    Write-Host "$service is already running"
+                }
+            } else {
+                Write-Host "Service $service not found"
+            }
+        }
+      register: dependency_start
+      
+    - name: Display dependency start results
+      debug:
+        msg: "{{ dependency_start.stdout }}"
+        
+    - name: Enable and start Windows Update service
+      win_shell: |
+        Write-Host "Configuring Windows Update service..."
+        
+        # Set service to auto-start
+        Set-Service -Name "wuauserv" -StartupType Automatic -ErrorAction SilentlyContinue
+        
+        # Try to start the service
+        try {
+            Start-Service -Name "wuauserv" -ErrorAction Stop
+            Write-Host "Windows Update service started successfully"
+        } catch {
+            Write-Host "Failed to start Windows Update service: $($_.Exception.Message)"
+            Write-Host "Trying alternative approach..."
+            
+            # Try restart approach
+            try {
+                Restart-Service -Name "wuauserv" -Force -ErrorAction Stop
+                Write-Host "Windows Update service restarted successfully"
+            } catch {
+                Write-Host "Failed to restart Windows Update service: $($_.Exception.Message)"
+            }
+        }
+      register: service_start
+      
+    - name: Display service start results
+      debug:
+        msg: "{{ service_start.stdout }}"
+        
+    - name: Verify Windows Update service is running
+      win_shell: |
+        $wuauserv = Get-Service -Name "wuauserv" -ErrorAction SilentlyContinue
+        if ($wuauserv) {
+            Write-Host "Final Windows Update Service Status:"
+            Write-Host "  Status: $($wuauserv.Status)"
+            Write-Host "  Start Type: $($wuauserv.StartType)"
+            
+            if ($wuauserv.Status -eq "Running") {
+                Write-Host "SUCCESS: Windows Update service is running"
+            } else {
+                Write-Host "WARNING: Windows Update service is not running"
+            }
+        } else {
+            Write-Host "ERROR: Windows Update service not found"
+        }
+      register: final_service_status
+      
+    - name: Display final service status
+      debug:
+        msg: "{{ final_service_status.stdout }}"
+        
+    # ========================================
+    # STEP 2: Install Windows Update PowerShell Module
+    # ========================================
+    
+    - name: Install PSWindowsUpdate module if not present
+      win_shell: |
+        Write-Host "Checking for PSWindowsUpdate module..."
+        
+        # Check if module is installed
+        $module = Get-Module -Name PSWindowsUpdate -ListAvailable -ErrorAction SilentlyContinue
+        if (-not $module) {
+            Write-Host "PSWindowsUpdate module not found. Installing..."
+            
+            # Install NuGet provider if needed
+            if (-not (Get-PackageProvider -Name NuGet -ErrorAction SilentlyContinue)) {
+                Write-Host "Installing NuGet package provider..."
+                Install-PackageProvider -Name NuGet -Force -Confirm:$false
+            }
+            
+            # Install PSWindowsUpdate module
+            Write-Host "Installing PSWindowsUpdate module..."
+            Install-Module -Name PSWindowsUpdate -Force -Confirm:$false
+            Write-Host "PSWindowsUpdate module installed successfully"
+        } else {
+            Write-Host "PSWindowsUpdate module is already installed"
+        }
+        
+        # Import the module
+        Import-Module PSWindowsUpdate -ErrorAction SilentlyContinue
+        Write-Host "PSWindowsUpdate module imported"
+      register: module_install
+      
+    - name: Display module installation results
+      debug:
+        msg: "{{ module_install.stdout }}"
+        
+    # ========================================
+    # STEP 3: Check for Available Updates
+    # ========================================
+    
+    - name: Check for available Windows updates
+      win_shell: |
+        Write-Host "Checking for available Windows updates..."
+        
+        try {
+            # Get available updates
+            $updates = Get-WindowsUpdate -MicrosoftUpdate -ErrorAction SilentlyContinue
+            
+            if ($updates) {
+                Write-Host "Found $($updates.Count) available updates:"
+                foreach ($update in $updates) {
+                    Write-Host "  - $($update.Title) (KB$($update.KB))"
+                }
+            } else {
+                Write-Host "No updates available or unable to check for updates"
+            }
+        } catch {
+            Write-Host "Error checking for updates: $($_.Exception.Message)"
+        }
+      register: update_check
+      
+    - name: Display update check results
+      debug:
+        msg: "{{ update_check.stdout }}"
+        
+    # ========================================
+    # STEP 4: Install Windows Updates
+    # ========================================
+    
+    - name: Install Windows updates
+      win_shell: |
+        Write-Host "Installing Windows updates..."
+        
+        try {
+            # Install all available updates
+            $result = Install-WindowsUpdate -MicrosoftUpdate -AcceptAll -IgnoreReboot -ErrorAction Stop
+            
+            if ($result) {
+                Write-Host "Successfully installed $($result.Count) updates:"
+                foreach ($update in $result) {
+                    Write-Host "  - $($update.Title) (KB$($update.KB))"
+                }
+            } else {
+                Write-Host "No updates were installed"
+            }
+        } catch {
+            Write-Host "Error installing updates: $($_.Exception.Message)"
+        }
+      register: update_install
+      
+    - name: Display update installation results
+      debug:
+        msg: "{{ update_install.stdout }}"
+        
+    # ========================================
+    # STEP 5: Check if Reboot is Required
+    # ========================================
+    
+    - name: Check if reboot is required
+      win_shell: |
+        Write-Host "Checking if reboot is required..."
+        
+        # Check if reboot is pending
+        $rebootPending = $false
+        
+        # Method 1: Check registry
+        $rebootPending = (Get-ItemProperty "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager" -Name PendingFileRenameOperations -ErrorAction SilentlyContinue).PendingFileRenameOperations
+        
+        # Method 2: Check CBS
+        if (-not $rebootPending) {
+            $cbs = Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending" -ErrorAction SilentlyContinue
+            $rebootPending = $cbs -ne $null
+        }
+        
+        # Method 3: Check Windows Update
+        if (-not $rebootPending) {
+            $wu = Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired" -ErrorAction SilentlyContinue
+            $rebootPending = $wu -ne $null
+        }
+        
+        if ($rebootPending) {
+            Write-Host "REBOOT REQUIRED: System needs to be restarted to complete updates"
+        } else {
+            Write-Host "No reboot required at this time"
+        }
+      register: reboot_check
+      
+    - name: Display reboot check results
+      debug:
+        msg: "{{ reboot_check.stdout }}"
+        
+    # ========================================
+    # STEP 6: Final Status Report
+    # ========================================
+    
+    - name: Generate final status report
+      win_shell: |
+        Write-Host "=== WINDOWS UPDATE COMPLETE STATUS REPORT ==="
+        
+        # Service status
+        $wuauserv = Get-Service -Name "wuauserv" -ErrorAction SilentlyContinue
+        Write-Host "Windows Update Service: $($wuauserv.Status)"
+        
+        # Check for pending reboot
+        $rebootPending = $false
+        $rebootPending = (Get-ItemProperty "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager" -Name PendingFileRenameOperations -ErrorAction SilentlyContinue).PendingFileRenameOperations
+        if (-not $rebootPending) {
+            $cbs = Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending" -ErrorAction SilentlyContinue
+            $rebootPending = $cbs -ne $null
+        }
+        if (-not $rebootPending) {
+            $wu = Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired" -ErrorAction SilentlyContinue
+            $rebootPending = $wu -ne $null
+        }
+        
+        if ($rebootPending) {
+            Write-Host "Reboot Status: REQUIRED"
+        } else {
+            Write-Host "Reboot Status: Not Required"
+        }
+        
+        Write-Host "=== END STATUS REPORT ==="
+      register: final_report
+      
+    - name: Display final report
+      debug:
+        msg: "{{ final_report.stdout }}" 
