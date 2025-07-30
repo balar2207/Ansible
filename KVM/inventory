@@ -15,10 +15,10 @@ Ansible-rockyslave-VM2
 Ansible-winslave-VM1
 Ansible-winslave-VM2
 
-[OVM]
-OVM-Server1
-OVM-Server2
-OVM-Server3
+[kVM]
+KVM-Server1
+KVM-Server2
+KVM-Server3
 
 [windows:vars]
 ansible_user=administrator
