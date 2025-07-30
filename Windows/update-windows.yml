@@ -1,0 +1,16 @@
+- name: Update Windows machines
+  hosts: windows
+  tasks:
+    - name: Install PSWindowsUpdate module
+      win_shell: |
+        Install-PackageProvider -Name NuGet -Force
+        Install-Module -Name PSWindowsUpdate -Force -Confirm:$false
+        Import-Module PSWindowsUpdate
+
+    - name: Run Windows Update
+      win_shell: |
+        Install-WindowsUpdate -AcceptAll -IgnoreReboot
+
+    - name: Reboot if required
+      win_reboot:
+        reboot_timeout: 3600
