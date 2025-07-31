@@ -1,0 +1,6 @@
+- name: Shutdown KVM
+  hosts: KVM
+  become: yes
+  tasks:
+    - name: Shutdown the system
+      command: shutdown -h now
