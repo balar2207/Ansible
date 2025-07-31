@@ -15,7 +15,7 @@ Ansible-rockyslave-VM2
 Ansible-winslave-VM1
 Ansible-winslave-VM2
 
-[kVM]
+[KVM]
 KVM-Server1
 KVM-Server2
 KVM-Server3
