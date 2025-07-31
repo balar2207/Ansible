@@ -1,0 +1,28 @@
+# This is the default ansible 'hosts' file.
+#
+# It should live in /etc/ansible/hosts
+#Below nodes are testing only!
+
+[macOS]
+Ansible-macslave-VM1
+Ansible-macslave-VM2
+
+[linux]
+Ansible-rockyslave-VM1
+Ansible-rockyslave-VM2
+
+[windows]
+Ansible-winslave-VM1
+Ansible-winslave-VM2
+
+[KVM]
+KVM-Server1
+KVM-Server2
+KVM-Server3
+
+[windows:vars]
+ansible_user=administrator
+ansible_password=123456@abc
+ansible_port=5985
+ansible_connection=winrm
+ansible_winrm_server_cert_validation=ignore
