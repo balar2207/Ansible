@@ -11,6 +11,12 @@
     - name: Ping the clientls- l
       ping:
 
+- name: Test KVM connection
+  hosts: KVM
+  tasks:
+    - name: Ping the clientls- l
+      ping:
+
 - name: Test macOS connection
   hosts: macOS
   tasks:
